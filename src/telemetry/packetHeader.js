@@ -1,5 +1,7 @@
 // Parses the 24-byte header that starts every UDP packet.
 // Returns { header, bytesRead } so callers know where the packet body starts.
+export const HEADER_SIZE = 24; //this is from the docs...should be correct
+
 export function parsePacketHeader(buffer) {
   let offset = 0;
 
@@ -13,6 +15,7 @@ export function parsePacketHeader(buffer) {
   const frameIdentifier = buffer.readUInt32LE(offset); offset += 4;
   const playerCarIndex = buffer.readUInt8(offset); offset += 1;
   const secondaryPlayerCarIndex = buffer.readUInt8(offset); offset += 1;
+  //no Little Endian (LE) on 8 bit fields as they only have 1 byte which are both MSB and LSB
 
   const header = {
     packetFormat,
