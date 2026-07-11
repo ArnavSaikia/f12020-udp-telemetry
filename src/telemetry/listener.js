@@ -3,6 +3,7 @@ import { parsePacketHeader } from './packetHeader.js';
 import { parseCarTelemetryPacket } from './carTelemetryPacket.js';
 import { parseCarStatusPacket } from './carStatusPacket.js';
 import { PacketIds } from './packetIds.js';
+import { raceState } from '../state/raceState.js';
 
 export function startListener(port = 20777) {
     const socket = dgram.createSocket('udp4');
@@ -12,18 +13,14 @@ export function startListener(port = 20777) {
 
         //if the packet type is for cars telemetries
         if (header.packetId === PacketIds.CAR_TELEMETRY) {
-            const { playerCar } = parseCarTelemetryPacket(buffer, header);
-            console.log(
-                `Speed: ${playerCar.speed} km/h | Gear: ${playerCar.gear} | RPM: ${playerCar.engineRPM} | DRS: ${playerCar.drs ? 'open' : 'closed'}`
-            );
+            const parsed = parseCarTelemetryPacket(buffer, header);
+            raceState.updateFromCarTelemetry(parsed, header);
         } 
         
-        // car statuses
+        //car statuses
         else if (header.packetId === PacketIds.CAR_STATUS) {
-            const { playerCar } = parseCarStatusPacket(buffer, header);
-            console.log(
-                `Fuel: ${playerCar.fuelInTank.toFixed(1)}kg (${playerCar.fuelRemainingLaps.toFixed(1)} laps left) | Tyre wear: [${playerCar.tyresWear.join(', ')}]% | ERS: ${(playerCar.ersStoreEnergy / 1000).toFixed(0)}kJ`
-            );
+            const parsed = parseCarStatusPacket(buffer, header);
+            raceState.updateFromCarStatus(parsed, header);
         }
         
         else {
