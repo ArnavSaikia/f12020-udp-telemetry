@@ -85,11 +85,89 @@ function buildFakeCarTelemetryPacket() {
     return buf;
 }
 
-const socket = dgram.createSocket('udp4');
-const packet = buildFakeCarTelemetryPacket();
+// mockSender.js — add alongside the Car Telemetry builder
+const CAR_STATUS_SIZE = 60;
 
-socket.send(packet, 20777, '127.0.0.1', (err) => {
+function writeCarStatus(buf, offset, values = {}) {
+    const v = {
+        tractionControl: 0, antiLockBrakes: 1, fuelMix: 1, frontBrakeBias: 55, pitLimiterStatus: 0,
+        fuelInTank: 45.2, fuelCapacity: 110, fuelRemainingLaps: 8.4,
+        maxRPM: 12000, idleRPM: 4000, maxGears: 8, drsAllowed: 1, drsActivationDistance: 0,
+        tyresWear: [22, 21, 25, 24],
+        actualTyreCompound: 16, tyreVisualCompound: 16, tyresAgeLaps: 12,
+        tyresDamage: [0, 0, 0, 0],
+        frontLeftWingDamage: 0, frontRightWingDamage: 0, rearWingDamage: 0,
+        drsFault: 0, engineDamage: 0, gearBoxDamage: 0, vehicleFiaFlags: 0,
+        ersStoreEnergy: 2400000, ersDeployMode: 2,
+        ersHarvestedThisLapMGUK: 0, ersHarvestedThisLapMGUH: 0, ersDeployedThisLap: 0,
+        ...values,
+    };
+
+    buf.writeUInt8(v.tractionControl, offset); offset += 1;
+    buf.writeUInt8(v.antiLockBrakes, offset); offset += 1;
+    buf.writeUInt8(v.fuelMix, offset); offset += 1;
+    buf.writeUInt8(v.frontBrakeBias, offset); offset += 1;
+    buf.writeUInt8(v.pitLimiterStatus, offset); offset += 1;
+
+    buf.writeFloatLE(v.fuelInTank, offset); offset += 4;
+    buf.writeFloatLE(v.fuelCapacity, offset); offset += 4;
+    buf.writeFloatLE(v.fuelRemainingLaps, offset); offset += 4;
+
+    buf.writeUInt16LE(v.maxRPM, offset); offset += 2;
+    buf.writeUInt16LE(v.idleRPM, offset); offset += 2;
+    buf.writeUInt8(v.maxGears, offset); offset += 1;
+    buf.writeUInt8(v.drsAllowed, offset); offset += 1;
+    buf.writeUInt16LE(v.drsActivationDistance, offset); offset += 2;
+
+    for (const w of v.tyresWear) { buf.writeUInt8(w, offset); offset += 1; }
+
+    buf.writeUInt8(v.actualTyreCompound, offset); offset += 1;
+    buf.writeUInt8(v.tyreVisualCompound, offset); offset += 1;
+    buf.writeUInt8(v.tyresAgeLaps, offset); offset += 1;
+
+    for (const d of v.tyresDamage) { buf.writeUInt8(d, offset); offset += 1; }
+
+    buf.writeUInt8(v.frontLeftWingDamage, offset); offset += 1;
+    buf.writeUInt8(v.frontRightWingDamage, offset); offset += 1;
+    buf.writeUInt8(v.rearWingDamage, offset); offset += 1;
+    buf.writeUInt8(v.drsFault, offset); offset += 1;
+    buf.writeUInt8(v.engineDamage, offset); offset += 1;
+    buf.writeUInt8(v.gearBoxDamage, offset); offset += 1;
+    buf.writeInt8(v.vehicleFiaFlags, offset); offset += 1;
+
+    buf.writeFloatLE(v.ersStoreEnergy, offset); offset += 4;
+    buf.writeUInt8(v.ersDeployMode, offset); offset += 1;
+    buf.writeFloatLE(v.ersHarvestedThisLapMGUK, offset); offset += 4;
+    buf.writeFloatLE(v.ersHarvestedThisLapMGUH, offset); offset += 4;
+    buf.writeFloatLE(v.ersDeployedThisLap, offset); offset += 4;
+
+    return offset;
+}
+
+function buildFakeCarStatusPacket() {
+    const totalSize = HEADER_SIZE + CAR_STATUS_SIZE * NUM_CARS;
+    const buf = Buffer.alloc(totalSize);
+
+    let offset = writeHeader(buf, 0, 7); // 7 = Car Status
+
+    offset = writeCarStatus(buf, offset); // car 0 = player, using the realistic defaults above
+
+    for (let i = 1; i < NUM_CARS; i++) {
+        offset = writeCarStatus(buf, offset);
+    }
+
+    return buf;
+}
+
+// Send both packet types to exercise the listener fully:
+const socket = dgram.createSocket('udp4');
+
+const telemetryPacket = buildFakeCarTelemetryPacket();
+socket.send(telemetryPacket, 20777, '127.0.0.1');
+
+const statusPacket = buildFakeCarStatusPacket();
+socket.send(statusPacket, 20777, '127.0.0.1', (err) => {
     if (err) console.error('Send failed:', err);
-    else console.log(`Sent fake Car Telemetry packet (${packet.length} bytes).`);
+    else console.log('Sent fake Car Telemetry + Car Status packets.');
     socket.close();
 });

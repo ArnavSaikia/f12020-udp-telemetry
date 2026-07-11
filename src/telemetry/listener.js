@@ -1,6 +1,7 @@
 import dgram from 'dgram';
 import { parsePacketHeader } from './packetHeader.js';
 import { parseCarTelemetryPacket } from './carTelemetryPacket.js';
+import { parseCarStatusPacket } from './carStatusPacket.js';
 import { PacketIds } from './packetIds.js';
 
 export function startListener(port = 20777) {
@@ -15,7 +16,17 @@ export function startListener(port = 20777) {
             console.log(
                 `Speed: ${playerCar.speed} km/h | Gear: ${playerCar.gear} | RPM: ${playerCar.engineRPM} | DRS: ${playerCar.drs ? 'open' : 'closed'}`
             );
-        } else {
+        } 
+        
+        // car statuses
+        else if (header.packetId === PacketIds.CAR_STATUS) {
+            const { playerCar } = parseCarStatusPacket(buffer, header);
+            console.log(
+                `Fuel: ${playerCar.fuelInTank.toFixed(1)}kg (${playerCar.fuelRemainingLaps.toFixed(1)} laps left) | Tyre wear: [${playerCar.tyresWear.join(', ')}]% | ERS: ${(playerCar.ersStoreEnergy / 1000).toFixed(0)}kJ`
+            );
+        }
+        
+        else {
             console.log(`Packet ID ${header.packetId} (not parsed yet)`);
         }
     });
