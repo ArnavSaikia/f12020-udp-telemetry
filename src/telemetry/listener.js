@@ -2,6 +2,8 @@ import dgram from 'dgram';
 import { parsePacketHeader } from './packetHeader.js';
 import { parseCarTelemetryPacket } from './carTelemetryPacket.js';
 import { parseCarStatusPacket } from './carStatusPacket.js';
+import { parseLapDataPacket } from './lapDataPacket.js';
+import { parseParticipantsPacket } from './participantsPacket.js';
 import { PacketIds } from './packetIds.js';
 import { raceState } from '../state/raceState.js';
 
@@ -11,20 +13,19 @@ export function startListener(port = 20777) {
     socket.on('message', (buffer) => {
         const { header } = parsePacketHeader(buffer);
 
-        //if the packet type is for cars telemetries
-        if (header.packetId === PacketIds.CAR_TELEMETRY) {
-            const parsed = parseCarTelemetryPacket(buffer, header);
-            raceState.updateFromCarTelemetry(parsed, header);
-        } 
-        
-        //car statuses
-        else if (header.packetId === PacketIds.CAR_STATUS) {
-            const parsed = parseCarStatusPacket(buffer, header);
-            raceState.updateFromCarStatus(parsed, header);
-        }
-        
-        else {
-            console.log(`Packet ID ${header.packetId} (not parsed yet)`);
+        switch (header.packetId) {
+            case PacketIds.CAR_TELEMETRY:
+                raceState.updateFromCarTelemetry(parseCarTelemetryPacket(buffer, header), header);
+                break;
+            case PacketIds.CAR_STATUS:
+                raceState.updateFromCarStatus(parseCarStatusPacket(buffer, header), header);
+                break;
+            case PacketIds.LAP_DATA:
+                raceState.updateFromLapData(parseLapDataPacket(buffer, header), header);
+                break;
+            case PacketIds.PARTICIPANTS:
+                raceState.updateFromParticipants(parseParticipantsPacket(buffer), header);
+                break;
         }
     });
 
