@@ -67,12 +67,22 @@ class RaceState {
         return idx === -1 ? null : { index: idx, car: this.cars[idx] };
     }
 
-    //may change the logic to use leader lapnum instead of player as a lap down car will finish 1 lap less
-    getLapsRemaining() {
+    getLeaderCar() {
+        return this.cars.find((car) => car.lapData?.carPosition === 1) ?? null;
+    }
+
+    getRaceLapsRemaining() {
         if (!this.session) return null;
-        const currentLap = this.getPlayerCar()?.lapData?.currentLapNum;
-        if (currentLap == null) return null;
-        return this.session.totalLaps - currentLap;
+        const leaderLap = this.getLeaderCar()?.lapData?.currentLapNum;
+        if (leaderLap == null) return null;
+        return this.session.totalLaps - leaderLap;
+    }
+
+    getPlayerLapsRemaining() {
+        if (!this.session) return null;
+        const playerLap = this.getPlayerCar()?.lapData?.currentLapNum;
+        if (playerLap == null) return null;
+        return this.session.totalLaps - playerLap;
     }
 }
 
