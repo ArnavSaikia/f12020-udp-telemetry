@@ -4,6 +4,7 @@ import { parseCarTelemetryPacket } from './carTelemetryPacket.js';
 import { parseCarStatusPacket } from './carStatusPacket.js';
 import { parseLapDataPacket } from './lapDataPacket.js';
 import { parseParticipantsPacket } from './participantsPacket.js';
+import { parseSessionPacket } from './sessionPacket.js';
 import { PacketIds } from './packetIds.js';
 import { raceState } from '../state/raceState.js';
 
@@ -25,6 +26,9 @@ export function startListener(port = 20777) {
                 break;
             case PacketIds.PARTICIPANTS:
                 raceState.updateFromParticipants(parseParticipantsPacket(buffer), header);
+                break;
+            case PacketIds.SESSION:
+                raceState.updateFromSession(parseSessionPacket(buffer));
                 break;
         }
     });

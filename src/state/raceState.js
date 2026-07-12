@@ -14,6 +14,7 @@ class RaceState {
         this.playerCarIndex = null;
         this.numActiveCars = null;
         this.cars = Array.from({ length: NUM_CARS }, emptyCar);
+        this.session = null; // global session-level data, not per-car
     }
 
     updateFromCarTelemetry(parsedPacket, header) {
@@ -45,6 +46,10 @@ class RaceState {
         });
     }
 
+    updateFromSession(parsedPacket) {
+        this.session = parsedPacket;
+    }
+
     getPlayerCar() {
         if (this.playerCarIndex === null) return null;
         return this.cars[this.playerCarIndex];
@@ -54,7 +59,6 @@ class RaceState {
         return this.cars[idx] ?? null;
     }
 
-    // Case-insensitive partial name match, e.g. findCarByName("hamilton")
     findCarByName(nameQuery) {
         const query = nameQuery.toLowerCase();
         const idx = this.cars.findIndex(
@@ -62,7 +66,15 @@ class RaceState {
         );
         return idx === -1 ? null : { index: idx, car: this.cars[idx] };
     }
+
+    //may change the logic to use leader lapnum instead of player as a lap down car will finish 1 lap less
+    getLapsRemaining() {
+        if (!this.session) return null;
+        const currentLap = this.getPlayerCar()?.lapData?.currentLapNum;
+        if (currentLap == null) return null;
+        return this.session.totalLaps - currentLap;
+    }
 }
 
-//singleton instance for the whole program to share
+//singleton instance for whole program to share
 export const raceState = new RaceState();

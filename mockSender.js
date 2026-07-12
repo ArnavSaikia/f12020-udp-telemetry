@@ -6,6 +6,10 @@ const CAR_STATUS_SIZE = 60;
 const LAP_DATA_SIZE = 53;
 const PARTICIPANT_SIZE = 54;
 const NUM_CARS = 22;
+const MARSHAL_ZONE_SIZE = 5;
+const NUM_MARSHAL_ZONES = 21;
+const WEATHER_SAMPLE_SIZE = 5;
+const NUM_WEATHER_SAMPLES = 20;
 
 function writeHeader(buf, offset, packetId) {
     buf.writeUInt16LE(2020, offset); offset += 2;
@@ -16,7 +20,7 @@ function writeHeader(buf, offset, packetId) {
     buf.writeBigUInt64LE(123456789n, offset); offset += 8;
     buf.writeFloatLE(12.5, offset); offset += 4;
     buf.writeUInt32LE(42, offset); offset += 4;
-    buf.writeUInt8(0, offset); offset += 1; // playerCarIndex = 0
+    buf.writeUInt8(0, offset); offset += 1;
     buf.writeUInt8(255, offset); offset += 1;
     return offset;
 }
@@ -152,9 +156,26 @@ function writeParticipant(buf, offset, values = {}) {
     buf.writeUInt8(v.teamId, offset); offset += 1;
     buf.writeUInt8(v.raceNumber, offset); offset += 1;
     buf.writeUInt8(v.nationality, offset); offset += 1;
-    buf.write(v.name, offset, 'utf8'); // remaining bytes in the 48-byte field stay zero (buffer pre-zeroed)
+    buf.write(v.name, offset, 'utf8');
     offset += 48;
     buf.writeUInt8(v.yourTelemetry, offset); offset += 1;
+    return offset;
+}
+
+function writeMarshalZone(buf, offset, values = {}) {
+    const v = { zoneStart: 0, zoneFlag: 0, ...values };
+    buf.writeFloatLE(v.zoneStart, offset); offset += 4;
+    buf.writeInt8(v.zoneFlag, offset); offset += 1;
+    return offset;
+}
+
+function writeWeatherSample(buf, offset, values = {}) {
+    const v = { sessionType: 10, timeOffset: 0, weather: 0, trackTemperature: 0, airTemperature: 0, ...values };
+    buf.writeUInt8(v.sessionType, offset); offset += 1;
+    buf.writeUInt8(v.timeOffset, offset); offset += 1;
+    buf.writeUInt8(v.weather, offset); offset += 1;
+    buf.writeInt8(v.trackTemperature, offset); offset += 1;
+    buf.writeInt8(v.airTemperature, offset); offset += 1;
     return offset;
 }
 
@@ -184,7 +205,6 @@ function buildLapDataPacket() {
     const totalSize = HEADER_SIZE + LAP_DATA_SIZE * NUM_CARS;
     const buf = Buffer.alloc(totalSize);
     let offset = writeHeader(buf, 0, 2);
-    // Player (car 0): P5. Car 3 (Hamilton): P2.
     offset = writeLapData(buf, offset, { carPosition: 5, currentLapNum: 12 });
     for (let i = 1; i < NUM_CARS; i++) {
         const overrides = i === 3 ? { carPosition: 2, currentLapNum: 12 } : {};
@@ -197,13 +217,50 @@ function buildParticipantsPacket() {
     const totalSize = HEADER_SIZE + 1 + PARTICIPANT_SIZE * NUM_CARS;
     const buf = Buffer.alloc(totalSize);
     let offset = writeHeader(buf, 0, 4);
-    buf.writeUInt8(20, offset); offset += 1; // numActiveCars
-
-    offset = writeParticipant(buf, offset, { aiControlled: 0, name: 'You' }); // car 0 = player
+    buf.writeUInt8(20, offset); offset += 1;
+    offset = writeParticipant(buf, offset, { aiControlled: 0, name: 'You' });
     for (let i = 1; i < NUM_CARS; i++) {
         const overrides = i === 3 ? { name: 'Lewis Hamilton', teamId: 0 } : { name: `AI Driver ${i}` };
         offset = writeParticipant(buf, offset, overrides);
     }
+    return buf;
+}
+
+function buildSessionPacket() {
+    const totalSize = HEADER_SIZE + 19 + MARSHAL_ZONE_SIZE * NUM_MARSHAL_ZONES + 3 + WEATHER_SAMPLE_SIZE * NUM_WEATHER_SAMPLES;
+    const buf = Buffer.alloc(totalSize);
+    let offset = writeHeader(buf, 0, 1); // 1 = Session
+
+    buf.writeUInt8(2, offset); offset += 1;      // weather: overcast
+    buf.writeInt8(32, offset); offset += 1;      // trackTemperature
+    buf.writeInt8(24, offset); offset += 1;      // airTemperature
+    buf.writeUInt8(58, offset); offset += 1;     // totalLaps
+    buf.writeUInt16LE(5412, offset); offset += 2; // trackLength
+    buf.writeUInt8(10, offset); offset += 1;     // sessionType: R (race)
+    buf.writeInt8(7, offset); offset += 1;       // trackId: Silverstone
+    buf.writeUInt8(0, offset); offset += 1;      // formula: F1 Modern
+    buf.writeUInt16LE(3600, offset); offset += 2; // sessionTimeLeft
+    buf.writeUInt16LE(5400, offset); offset += 2; // sessionDuration
+    buf.writeUInt8(80, offset); offset += 1;     // pitSpeedLimit
+    buf.writeUInt8(0, offset); offset += 1;      // gamePaused
+    buf.writeUInt8(0, offset); offset += 1;      // isSpectating
+    buf.writeUInt8(255, offset); offset += 1;    // spectatorCarIndex
+    buf.writeUInt8(0, offset); offset += 1;      // sliProNativeSupport
+    buf.writeUInt8(3, offset); offset += 1;      // numMarshalZones (only 3 real, rest zero)
+
+    offset = writeMarshalZone(buf, offset, { zoneStart: 0.1, zoneFlag: 1 });
+    offset = writeMarshalZone(buf, offset, { zoneStart: 0.5, zoneFlag: 3 });
+    offset = writeMarshalZone(buf, offset, { zoneStart: 0.8, zoneFlag: 1 });
+    for (let i = 3; i < NUM_MARSHAL_ZONES; i++) offset = writeMarshalZone(buf, offset);
+
+    buf.writeUInt8(0, offset); offset += 1; // safetyCarStatus: none
+    buf.writeUInt8(0, offset); offset += 1; // networkGame: offline
+    buf.writeUInt8(2, offset); offset += 1; // numWeatherForecastSamples (only 2 real)
+
+    offset = writeWeatherSample(buf, offset, { timeOffset: 5, weather: 2, trackTemperature: 32, airTemperature: 24 });
+    offset = writeWeatherSample(buf, offset, { timeOffset: 15, weather: 3, trackTemperature: 30, airTemperature: 23 });
+    for (let i = 2; i < NUM_WEATHER_SAMPLES; i++) offset = writeWeatherSample(buf, offset);
+
     return buf;
 }
 
@@ -214,6 +271,7 @@ const packets = [
     buildCarStatusPacket(),
     buildLapDataPacket(),
     buildParticipantsPacket(),
+    buildSessionPacket(),
 ];
 
 let sent = 0;
@@ -222,7 +280,7 @@ for (const packet of packets) {
         sent += 1;
         if (err) console.error('Send failed:', err);
         if (sent === packets.length) {
-            console.log(`Sent ${packets.length} fake packets (telemetry, status, lap data, participants).`);
+            console.log(`Sent ${packets.length} fake packets (telemetry, status, lap data, participants, session).`);
             socket.close();
         }
     });
