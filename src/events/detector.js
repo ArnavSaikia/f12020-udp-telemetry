@@ -1,12 +1,8 @@
 import { EventEmitter } from 'events';
 import { EventTypes } from './eventTypes.js';
 import { THRESHOLDS } from '../../config/thresholds.js';
-
+import { REAR_LEFT_IDX, REAR_RIGHT_IDX, FRONT_LEFT_IDX, FRONT_RIGHT_IDX } from '../telemetry/tyreIndices.js';
 // tyresSurfaceTemperature array order is [RL, RR, FL, FR] per the spec.
-const REAR_LEFT_IDX = 0;
-const REAR_RIGHT_IDX = 1;
-const FRONT_LEFT_IDX = 2;
-const FRONT_RIGHT_IDX = 3;
 
 export class EventDetector extends EventEmitter {
     constructor() {
