@@ -1,0 +1,4 @@
+export const THRESHOLDS = {
+    TYRE_SURFACE_OVERHEAT_C: 105,
+    LOW_FUEL_LAPS: 2,
+};
